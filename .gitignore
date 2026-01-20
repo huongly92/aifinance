@@ -1,0 +1,106 @@
+# ============================================
+# CREDENTIALS - KHÔNG BAO GIỜ ĐẨYPUSH LÊN GITHUB
+# ============================================
+credentials.json
+*.json
+.streamlit/
+.streamlit/secrets.toml
+streamlit/
+streamlit/secrets.toml
+
+# ============================================
+# TEST/TEMPORARY FILES
+# ============================================
+gdrive_data_loader.py
+*_old.py
+*_backup.py
+*_test.py
+
+# ============================================
+# PYTHON
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# ============================================
+# IDE & EDITORS
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ============================================
+# OS SPECIFIC
+# ============================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# ============================================
+# LOGS & DATABASES
+# ============================================
+*.log
+*.sql
+*.sqlite
+*.db
+
+# ============================================
+# ENVIRONMENT VARIABLES
+# ============================================
+.env
+.env.local
+.env.*.local
+
+# ============================================
+# JUPYTER NOTEBOOKS
+# ============================================
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# ============================================
+# DATA FILES (OPTIONAL - Uncomment if needed)
+# ============================================
+# data/
+# *.csv
+# *.xlsx
+# *.parquet
