@@ -1,347 +1,268 @@
 """
-COMPREHENSIVE DIAGNOSTIC TOOL
-Tests every step of Google Drive connection in detail
+Main Application File
+Dashboard Phan Tich Chung Khoan Viet Nam
 """
 
 import streamlit as st
-import io
 import sys
-import traceback
+from pathlib import Path
 
-st.title("🔬 Comprehensive Diagnostic Tool")
-st.markdown("---")
-
-# ============================================
-# TEST 1: Check Streamlit Environment
-# ============================================
-st.markdown("## 1️⃣ Streamlit Environment")
-
+# ========== CLEAR ALL CACHES AT STARTUP ==========
+# This fixes cache issues from previous errors
 try:
-    st.success(f"✅ Streamlit version: {st.__version__}")
-    st.info(f"🐍 Python version: {sys.version}")
-    st.success("✅ Streamlit running OK")
-except Exception as e:
-    st.error(f"❌ Streamlit error: {e}")
+    st.cache_data.clear()
+    st.cache_resource.clear()
+except:
+    pass
 
-st.markdown("---")
+# Add root directory to path
+ROOT_DIR = Path(__file__).parent
+sys.path.insert(0, str(ROOT_DIR))
 
-# ============================================
-# TEST 2: Check Secrets Availability
-# ============================================
-st.markdown("## 2️⃣ Secrets Availability")
+import config
+from data_loader import load_all_data
+from excel_helper import get_excel_processor
 
+# ========== PAGE CONFIGURATION ==========
+st.set_page_config(
+    page_title=config.APP_TITLE,
+    page_icon=config.APP_ICON,
+    layout=config.LAYOUT,
+    initial_sidebar_state=config.INITIAL_SIDEBAR_STATE
+)
+
+# ========== CONFIGURATION - GOOGLE DRIVE FILE IDs ==========
+MAP_FILE_ID = "1Xl9yKLsNnizAZsEaRWwuCTitxe99JDo5"
+LOCAL_MAP_PATH = "D:/aifinance_project/data/raw/Map_Complete.xlsx"
+
+# ========== LOAD DATA ==========
+@st.cache_data(ttl=3600, show_spinner=True)
+def load_data():
+    """
+    Load all data from Google Drive with caching
+    """
+    return load_all_data()
+
+# ========== LOAD EXCEL PROCESSOR ==========
+@st.cache_resource
+def load_excel_processor():
+    """
+    Load Excel Processor
+    """
+    processor = get_excel_processor(
+        local_file_path=LOCAL_MAP_PATH,
+        gdrive_file_id=MAP_FILE_ID,
+        file_name="Map_Complete.xlsx"
+    )
+    return processor
+
+# ========== INITIALIZE DATA ==========
 try:
-    if not hasattr(st, 'secrets'):
-        st.error("❌ st.secrets not available")
-        st.stop()
+    # Load parquet data (market, industry, ticker, map)
+    market_df, industry_df, ticker_df, map_df = load_data()
     
-    if 'gcp_service_account' not in st.secrets:
-        st.error("❌ gcp_service_account not found in secrets")
-        st.write("Available secrets:", list(st.secrets.keys()) if st.secrets else "None")
-        st.stop()
-    
-    st.success("✅ gcp_service_account found in secrets")
-    
-    # Show what keys are present
-    secret_keys = list(st.secrets['gcp_service_account'].keys())
-    st.write("Keys present:", secret_keys)
-    
-    # Validate required keys
-    required_keys = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
-    missing_keys = [k for k in required_keys if k not in secret_keys]
-    
-    if missing_keys:
-        st.error(f"❌ Missing required keys: {missing_keys}")
-        st.stop()
-    else:
-        st.success(f"✅ All required keys present ({len(secret_keys)} total)")
-    
-    # Show client_email (safe to display)
-    client_email = st.secrets['gcp_service_account'].get('client_email', 'N/A')
-    st.info(f"📧 Service Account Email: `{client_email}`")
-    
-    # Check private_key format
-    private_key = st.secrets['gcp_service_account'].get('private_key', '')
-    st.write(f"🔑 Private key length: {len(private_key)} characters")
-    
-    if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
-        st.error("❌ Private key doesn't start with '-----BEGIN PRIVATE KEY-----'")
-        st.write("First 50 chars:", private_key[:50])
-    else:
-        st.success("✅ Private key starts correctly")
-    
-    if not private_key.strip().endswith('-----END PRIVATE KEY-----'):
-        st.error("❌ Private key doesn't end with '-----END PRIVATE KEY-----'")
-        st.write("Last 50 chars:", private_key[-50:])
-    else:
-        st.success("✅ Private key ends correctly")
-    
-    # Check for \n in private_key
-    if '\\n' in private_key:
-        st.success("✅ Private key contains \\n characters (correct)")
-    else:
-        st.warning("⚠️ Private key might be missing \\n characters")
-    
-except Exception as e:
-    st.error(f"❌ Error checking secrets: {e}")
-    st.code(traceback.format_exc())
-    st.stop()
-
-st.markdown("---")
-
-# ============================================
-# TEST 3: Import Google Libraries
-# ============================================
-st.markdown("## 3️⃣ Import Google Libraries")
-
-try:
-    from google.oauth2 import service_account
-    st.success("✅ Imported google.oauth2.service_account")
-    
-    from googleapiclient.discovery import build
-    st.success("✅ Imported googleapiclient.discovery.build")
-    
-    from googleapiclient.http import MediaIoBaseDownload
-    st.success("✅ Imported googleapiclient.http.MediaIoBaseDownload")
-    
-except ImportError as e:
-    st.error(f"❌ Import error: {e}")
-    st.info("Try: pip install google-api-python-client google-auth")
-    st.stop()
-except Exception as e:
-    st.error(f"❌ Unexpected error: {e}")
-    st.code(traceback.format_exc())
-    st.stop()
-
-st.markdown("---")
-
-# ============================================
-# TEST 4: Create Credentials
-# ============================================
-st.markdown("## 4️⃣ Create Service Account Credentials")
-
-try:
-    with st.spinner("Creating credentials..."):
-        credentials = service_account.Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"],
-            scopes=['https://www.googleapis.com/auth/drive.readonly']
-        )
-    
-    st.success("✅ Credentials created successfully")
-    st.write(f"Service account email: {credentials.service_account_email}")
-    st.write(f"Project ID: {credentials.project_id}")
-    
-except ValueError as e:
-    st.error(f"❌ ValueError creating credentials: {e}")
-    st.error("This usually means the private_key format is wrong")
-    st.code(traceback.format_exc())
-    st.stop()
-except Exception as e:
-    st.error(f"❌ Error creating credentials: {e}")
-    st.code(traceback.format_exc())
-    st.stop()
-
-st.markdown("---")
-
-# ============================================
-# TEST 5: Build Drive Service
-# ============================================
-st.markdown("## 5️⃣ Build Google Drive Service")
-
-try:
-    with st.spinner("Building Drive service..."):
-        service = build('drive', 'v3', credentials=credentials)
-    
-    st.success("✅ Google Drive service built successfully")
-    
-except Exception as e:
-    st.error(f"❌ Error building service: {e}")
-    st.code(traceback.format_exc())
-    st.stop()
-
-st.markdown("---")
-
-# ============================================
-# TEST 6: Test File Access (Get Metadata)
-# ============================================
-st.markdown("## 6️⃣ Test File Access - Get Metadata")
-
-TEST_FILE_ID = "1aNNTscWUOew7vnpZV18Y0UhfifejrKEQ"  # market_analysis.parquet
-FILE_NAME = "market_analysis.parquet"
-
-st.info(f"Testing file: **{FILE_NAME}**")
-st.caption(f"File ID: `{TEST_FILE_ID}`")
-
-try:
-    with st.spinner("Getting file metadata..."):
-        file_metadata = service.files().get(
-            fileId=TEST_FILE_ID, 
-            fields='id,name,size,mimeType,createdTime,modifiedTime'
-        ).execute()
-    
-    st.success("✅ File metadata retrieved successfully!")
-    
-    # Display metadata
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("File Name", file_metadata.get('name', 'N/A'))
-        st.metric("File ID", file_metadata.get('id', 'N/A'))
-        st.metric("MIME Type", file_metadata.get('mimeType', 'N/A'))
-    
-    with col2:
-        size_bytes = int(file_metadata.get('size', 0))
-        size_mb = size_bytes / (1024 * 1024)
-        st.metric("File Size", f"{size_mb:.2f} MB")
-        st.metric("Created", file_metadata.get('createdTime', 'N/A')[:10])
-        st.metric("Modified", file_metadata.get('modifiedTime', 'N/A')[:10])
-    
-    st.json(file_metadata)
-    
-except Exception as e:
-    error_str = str(e)
-    st.error(f"❌ Error getting file metadata: {e}")
-    
-    if "404" in error_str or "not found" in error_str.lower():
-        st.warning("""
-        **404 Not Found Error**
-        - File ID might be wrong
-        - File might have been deleted
-        - Check the file exists at: https://drive.google.com/file/d/{}/view
-        """.format(TEST_FILE_ID))
-    
-    elif "403" in error_str or "permission" in error_str.lower():
-        st.warning(f"""
-        **403 Permission Denied Error**
-        - File not shared with Service Account
-        - Make sure you shared the file with: `{client_email}`
-        - Permission should be "Viewer" or "Editor"
-        """)
-    
-    elif "401" in error_str or "unauthorized" in error_str.lower():
-        st.warning("""
-        **401 Unauthorized Error**
-        - Service Account credentials are invalid
-        - Check your Streamlit Secrets
-        - Verify private_key is correct
-        """)
-    
-    st.code(traceback.format_exc())
-    st.stop()
-
-st.markdown("---")
-
-# ============================================
-# TEST 7: Download File Content
-# ============================================
-st.markdown("## 7️⃣ Download File Content")
-
-if st.button("🚀 Test Download File"):
-    try:
-        with st.spinner(f"Downloading {FILE_NAME}..."):
-            request = service.files().get_media(fileId=TEST_FILE_ID)
-            
-            file_buffer = io.BytesIO()
-            downloader = MediaIoBaseDownload(file_buffer, request)
-            
-            done = False
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            while not done:
-                status, done = downloader.next_chunk()
-                if status:
-                    progress = int(status.progress() * 100)
-                    progress_bar.progress(progress)
-                    status_text.text(f"Downloaded: {progress}%")
-            
-            file_buffer.seek(0)
-            file_size = len(file_buffer.getvalue())
-            
-            st.success(f"✅ File downloaded successfully!")
-            st.metric("Downloaded Size", f"{file_size:,} bytes ({file_size/(1024*1024):.2f} MB)")
-            
-            # Try to read as parquet
-            st.markdown("### 8️⃣ Read as Parquet")
-            try:
-                import pandas as pd
-                df = pd.read_parquet(file_buffer)
-                
-                st.success(f"✅ Parquet file read successfully!")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Rows", f"{len(df):,}")
-                with col2:
-                    st.metric("Columns", len(df.columns))
-                with col3:
-                    st.metric("Memory", f"{df.memory_usage(deep=True).sum() / (1024*1024):.2f} MB")
-                
-                st.markdown("**Column Names:**")
-                st.write(list(df.columns))
-                
-                st.markdown("**Sample Data (first 5 rows):**")
-                st.dataframe(df.head())
-                
-                st.markdown("**Data Types:**")
-                st.write(df.dtypes)
-                
-            except Exception as e:
-                st.error(f"❌ Error reading parquet: {e}")
-                st.code(traceback.format_exc())
+    # Store in session state
+    if 'market_df' not in st.session_state:
+        st.session_state.market_df = market_df
+    if 'industry_df' not in st.session_state:
+        st.session_state.industry_df = industry_df
+    if 'ticker_df' not in st.session_state:
+        st.session_state.ticker_df = ticker_df
+    if 'map_df' not in st.session_state:
+        st.session_state.map_df = map_df
         
-    except Exception as e:
-        st.error(f"❌ Error downloading file: {e}")
+except Exception as e:
+    st.error(f"""
+    **Error loading data!**
+    
+    **If running on Cloud:**
+    - Check Streamlit Secrets are configured correctly
+    - Verify File IDs in data_loader.py
+    - Ensure files are shared with Service Account
+    
+    **Error details:** {str(e)}
+    """)
+    
+    # Show debug info
+    with st.expander("🔍 Debug Information"):
+        import traceback
         st.code(traceback.format_exc())
+        
+        st.markdown("### Troubleshooting:")
+        st.markdown("""
+        1. Check if files are shared with Service Account
+        2. Verify Streamlit Secrets are saved
+        3. Try running diagnostic tool (app_diagnostic_v2.py)
+        4. Check File IDs are correct
+        """)
+    
+    st.stop()
+
+# ========== SIDEBAR ==========
+with st.sidebar:
+    st.title(config.APP_ICON + " Dashboard CK")
+    st.markdown("---")
+    
+    # Navigation
+    st.markdown("### 📌 Navigation")
+    st.markdown("""
+    - 🏛️ Market Overview
+    - 🏭 Industry Analysis
+    - 📊 Stock Analysis
+    - ⚖️ Comparison
+    - 🔍 Screening
+    - ⭐ Watchlist
+    """)
+    
+    st.markdown("---")
+    
+    # Data info
+    st.markdown("### 📈 Data Information")
+    st.info(f"""
+    **Market**: {len(market_df)} quarters  
+    **Industries**: {industry_df['SYMBOL'].nunique()} sectors  
+    **Stocks**: {ticker_df['SYMBOL'].nunique()} tickers
+    """)
+    
+    # Latest quarter
+    latest_quarter = market_df.iloc[-1]['QUARTER']
+    latest_year = market_df.iloc[-1]['YEAR']
+    st.success(f"📅 Latest: **{latest_quarter} {latest_year}**")
+    
+    st.markdown("---")
+    st.caption("Dashboard v1.0 | BSC Research")
+
+# ========== MAIN PAGE ==========
+st.title("📊 Vietnam Stock Market Analysis Dashboard")
+
+st.markdown("""
+### Welcome to Stock Analysis Dashboard! 👋
+
+This dashboard provides comprehensive analysis tools for stock investors:
+
+#### 🎯 Main Features:
+
+1. **🏛️ Market Overview**
+   - Track market trends over time
+   - Analyze macro indicators (P/E, P/B, ROE, etc.)
+   - Assess overall market health
+
+2. **🏭 Industry Analysis**
+   - Compare performance across industries
+   - Industry rankings by criteria
+   - Identify sector rotation trends
+
+3. **📊 Stock Analysis**
+   - Deep dive into individual stocks
+   - Valuation, profitability, cash flow analysis
+   - Risk analysis with Z-Score
+
+4. **⚖️ Comparison**
+   - Compare multiple stocks
+   - Correlation matrix
+   - Comprehensive scoring and ranking
+
+5. **🔍 Screening**
+   - Find investment opportunities with multi-criteria filters
+   - Pre-built screening strategies
+   - Export results
+
+6. **⭐ Watchlist**
+   - Manage personal watchlist
+   - Track changes
+   - Portfolio analysis
+
+---
+
+### 🚀 How to use:
+
+1. **Select page** from left navigation
+2. **Customize filters** as needed
+3. **Interact with charts**: zoom, pan, hover for details
+4. **Export data** when needed
+
+---
+
+### 📊 Data Statistics:
+""")
+
+# Display data statistics
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        "Quarters",
+        len(market_df),
+        help="Total quarters of market data"
+    )
+
+with col2:
+    st.metric(
+        "Industries",
+        industry_df['SYMBOL'].nunique(),
+        help="Total industries analyzed"
+    )
+
+with col3:
+    st.metric(
+        "Stocks",
+        ticker_df['SYMBOL'].nunique(),
+        help="Total stock tickers"
+    )
 
 st.markdown("---")
 
-# ============================================
-# TEST 8: Test All 4 Files
-# ============================================
-st.markdown("## 9️⃣ Test All 4 Files")
+# Quick stats
+st.markdown("### 📈 Quick Stats (Latest Quarter)")
 
-FILES_TO_TEST = [
-    ("market_analysis.parquet", "1aNNTscWUOew7vnpZV18Y0UhfifejrKEQ"),
-    ("industry_analysis.parquet", "18M4_ekSvR4skUl6V9ufDyjXssu-NBLdB"),
-    ("ticker_analysis.parquet", "1__PIPDg1IoHvauhBgN-SNyVAiNZKRbtD"),
-    ("Map_Complete.xlsx", "1Xl9yKLsNnizAZsEaRWwuCTitxe99JDo5"),
-]
+latest_market = market_df.iloc[-1]
 
-if st.button("🔍 Test All 4 Files Metadata"):
-    for file_name, file_id in FILES_TO_TEST:
-        try:
-            with st.spinner(f"Checking {file_name}..."):
-                metadata = service.files().get(fileId=file_id, fields='name,size').execute()
-                size_mb = int(metadata.get('size', 0)) / (1024 * 1024)
-                st.success(f"✅ {file_name}: {size_mb:.2f} MB")
-        except Exception as e:
-            st.error(f"❌ {file_name}: {str(e)[:100]}")
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    from utils.formatters import format_billion, format_change
+    market_cap = latest_market.get('MARKET_CAP_EOQ', 0)
+    market_cap_change = latest_market.get('MARKET_CAP_EOQ_GYOY', 0) if 'MARKET_CAP_EOQ_GYOY' in latest_market else None
+    st.metric(
+        "Market Cap",
+        format_billion(market_cap),
+        format_change(market_cap_change) if market_cap_change else None
+    )
+
+with col2:
+    from utils.formatters import format_ratio
+    st.metric(
+        "Avg P/E",
+        format_ratio(latest_market.get('PE_EOQ', 0)),
+        help="Average Price-to-Earnings ratio"
+    )
+
+with col3:
+    from utils.formatters import format_percent
+    st.metric(
+        "Avg ROE",
+        format_percent(latest_market.get('ROAE', 0)),
+        help="Average Return on Equity"
+    )
+
+with col4:
+    st.metric(
+        "Avg P/B",
+        format_ratio(latest_market.get('PB_EOQ', 0)),
+        help="Average Price-to-Book ratio"
+    )
 
 st.markdown("---")
-
-# ============================================
-# Summary
-# ============================================
-st.markdown("## 📊 Diagnostic Summary")
 
 st.info("""
-**If all tests above passed:**
-- ✅ Streamlit Secrets configured correctly
-- ✅ Service Account credentials valid
-- ✅ Google Drive API accessible
-- ✅ Files shared correctly
-- ✅ Files can be downloaded and read
-
-**Your app should work!** The issue might be:
-- Cache (try clearing Streamlit cache)
-- Timeout (files too large)
-- Different app.py version
-
-**If any test failed:**
-- Check the error message above
-- Follow the suggested fixes
-- Re-run this diagnostic tool
+💡 **Tips:**
+- Use left sidebar to navigate between pages
+- Each page has filters to customize analysis
+- Charts are interactive - zoom, pan, and download
+- Tables can be sorted and exported
 """)
 
 st.markdown("---")
-st.caption("Diagnostic Tool v2.0 | Comprehensive Testing")
+st.caption("© 2024 BSC Research | Dashboard v1.0")
+
+st.success("✅ Data loaded successfully! Select a page from the sidebar to start analyzing.")
