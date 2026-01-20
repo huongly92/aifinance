@@ -1,24 +1,8 @@
-# Core Framework
-streamlit>=1.32.0
-
-# Data Processing
-pandas>=2.0.0
-numpy>=1.24.0
-
-# Google Drive Integration
-google-auth>=2.28.0
-google-auth-oauthlib>=1.2.0
-google-auth-httplib2>=0.2.0
-google-api-python-client>=2.119.0
-
-# File Format Support
-pyarrow>=15.0.0          # For Parquet files
-openpyxl>=3.1.2          # For Excel files (.xlsx)
-
-# Visualization (nếu dùng trong components)
-plotly>=5.18.0
-matplotlib>=3.8.0
-
-# Optional: Nếu app của bạn có dùng thêm
-# altair>=5.0.0          # Alternative charting library
-# seaborn>=0.13.0        # Statistical visualization
+# Minimal requirements for Vietnam Stock Dashboard
+streamlit==1.53.0
+pandas==2.3.3
+google-api-python-client==2.188.0
+google-auth==2.47.0
+google-auth-httplib2==0.3.0
+openpyxl==3.1.5
+pyarrow==23.0.0
