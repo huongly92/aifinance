@@ -1,6 +1,6 @@
 """
 Data Loader Module
-Load và cache dữ liệu từ Google Drive (cloud) hoặc local files
+Load and cache data from Google Drive (cloud) or local files
 """
 
 import streamlit as st
@@ -13,47 +13,46 @@ from googleapiclient.http import MediaIoBaseDownload
 
 
 # ============================================
-# PHẦN 1: CONFIGURATION
+# CONFIGURATION
 # ============================================
 
-# ⚠️ TODO: THAY THẾ 4 FILE IDs BÊN DƯỚI BẰNG FILE IDs THỰC CỦA BẠN (từ Bước 3.3)
+# TODO: Replace these File IDs with your actual Google Drive File IDs
 MARKET_FILE_ID = "1aNNTscWUOew7vnpZV18Y0UhfifejrKEQ"
 INDUSTRY_FILE_ID = "18M4_ekSvR4skUl6V9ufDyjXssu-NBLdB"
 TICKER_FILE_ID = "1__PIPDg1IoHvauhBgN-SNyVAiNZKRbtD"
 MAP_FILE_ID = "1Xl9yKLsNnizAZsEaRWwuCTitxe99JDo5"
 
-# Local file paths (dùng khi develop)
+# Local file paths (for development)
 LOCAL_DATA_DIR = "D:/aifinance_project/data/output"
 LOCAL_MAP_PATH = "D:/aifinance_project/data/raw/Map_Complete.xlsx"
 
 
 # ============================================
-# PHẦN 2: DETECT ENVIRONMENT
+# ENVIRONMENT DETECTION
 # ============================================
 
 def is_running_on_cloud():
     """
-    Kiểm tra xem app đang chạy trên cloud hay local
+    Check if app is running on cloud or local
     
     Returns:
-        bool: True nếu đang chạy trên cloud (có secrets), False nếu local
+        bool: True if running on cloud (has secrets), False if local
     """
     try:
-        # Kiểm tra xem có st.secrets và gcp_service_account không
         return hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets
     except:
         return False
 
 
 # ============================================
-# PHẦN 3: GOOGLE DRIVE FUNCTIONS (CLOUD ONLY)
+# GOOGLE DRIVE FUNCTIONS (CLOUD ONLY)
 # ============================================
 
 @st.cache_resource
 def get_drive_service():
     """
-    Tạo kết nối với Google Drive API
-    CHỈ GỌI KHI CHẠY TRÊN CLOUD
+    Create connection to Google Drive API
+    ONLY CALL WHEN RUNNING ON CLOUD
     
     Returns:
         Resource: Google Drive API service
@@ -66,19 +65,19 @@ def get_drive_service():
         service = build('drive', 'v3', credentials=credentials)
         return service
     except Exception as e:
-        st.error(f"❌ Lỗi khi kết nối Google Drive: {e}")
+        st.error(f"Error connecting to Google Drive: {e}")
         st.stop()
 
 
-@st.cache_data(ttl=3600)  # Cache 1 giờ
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def download_file_from_drive(file_id, file_name):
     """
-    Download file từ Google Drive bằng File ID
-    CHỈ GỌI KHI CHẠY TRÊN CLOUD
+    Download file from Google Drive using File ID
+    ONLY CALL WHEN RUNNING ON CLOUD
     
     Args:
         file_id: Google Drive File ID
-        file_name: Tên file (để hiển thị thông báo)
+        file_name: File name (for display)
         
     Returns:
         BytesIO: File buffer
@@ -98,21 +97,21 @@ def download_file_from_drive(file_id, file_name):
         return file_buffer
         
     except Exception as e:
-        st.error(f"❌ Lỗi khi download {file_name}: {e}")
+        st.error(f"Error downloading {file_name}: {e}")
         st.stop()
 
 
 # ============================================
-# PHẦN 4: LOAD DATA - AUTO DETECT LOCAL VS CLOUD
+# LOAD DATA - AUTO DETECT LOCAL VS CLOUD
 # ============================================
 
-@st.cache_data(ttl=3600)  # Cache 1 giờ
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def load_all_data():
     """
-    Load tất cả dữ liệu - TỰ ĐỘNG DETECT LOCAL VS CLOUD
+    Load all data - AUTO DETECT LOCAL VS CLOUD
     
-    - Local: Load từ D:/ (hoặc đường dẫn local)
-    - Cloud: Load từ Google Drive
+    - Local: Load from D:/ (or local path)
+    - Cloud: Load from Google Drive
     
     Returns:
         tuple: (market_df, industry_df, ticker_df, map_df)
@@ -121,39 +120,39 @@ def load_all_data():
     IS_CLOUD = is_running_on_cloud()
     
     if IS_CLOUD:
-        # ========== CLOUD MODE: Load từ Google Drive ==========
-        st.info('🌐 Chạy trên Cloud - Đang tải dữ liệu từ Google Drive...')
+        # ========== CLOUD MODE: Load from Google Drive ==========
+        st.info('Cloud mode - Loading data from Google Drive...')
         
-        with st.spinner('🔄 Đang tải dữ liệu từ Google Drive...'):
+        with st.spinner('Loading data from Google Drive...'):
             try:
-                # Download files từ Google Drive
+                # Download files from Google Drive
                 market_buffer = download_file_from_drive(MARKET_FILE_ID, "market_analysis.parquet")
                 industry_buffer = download_file_from_drive(INDUSTRY_FILE_ID, "industry_analysis.parquet")
                 ticker_buffer = download_file_from_drive(TICKER_FILE_ID, "ticker_analysis.parquet")
                 map_buffer = download_file_from_drive(MAP_FILE_ID, "Map_Complete.xlsx")
                 
-                # Load vào pandas DataFrames
+                # Load into pandas DataFrames
                 market_df = pd.read_parquet(market_buffer)
                 industry_df = pd.read_parquet(industry_buffer)
                 ticker_df = pd.read_parquet(ticker_buffer)
                 map_df = pd.read_excel(map_buffer)
                 
-                # Sắp xếp theo thời gian
+                # Sort by time
                 market_df = market_df.sort_values(['YEAR', 'QUARTER'])
                 industry_df = industry_df.sort_values(['SYMBOL', 'YEAR', 'QUARTER'])
                 ticker_df = ticker_df.sort_values(['SYMBOL', 'YEAR', 'QUARTER'])
                 
-                st.success('✅ Đã tải xong dữ liệu từ Google Drive!')
+                st.success('Successfully loaded data from Google Drive!')
                 
                 return market_df, industry_df, ticker_df, map_df
                 
             except Exception as e:
-                st.error(f"❌ Lỗi khi load dữ liệu từ Google Drive: {e}")
+                st.error(f"Error loading data from Google Drive: {e}")
                 st.stop()
     
     else:
-        # ========== LOCAL MODE: Load từ local files ==========
-        st.info('💻 Chạy Local - Đang tải dữ liệu từ local files...')
+        # ========== LOCAL MODE: Load from local files ==========
+        st.info('Local mode - Loading data from local files...')
         
         try:
             # Construct file paths
@@ -161,39 +160,39 @@ def load_all_data():
             industry_file = f"{LOCAL_DATA_DIR}/industry_analysis.parquet"
             ticker_file = f"{LOCAL_DATA_DIR}/ticker_analysis.parquet"
             
-            # Kiểm tra files tồn tại
+            # Check if files exist
             if not os.path.exists(market_file):
-                st.error(f"❌ File không tồn tại: {market_file}")
-                st.info(f"💡 Vui lòng kiểm tra đường dẫn hoặc cập nhật LOCAL_DATA_DIR trong utils/data_loader.py")
+                st.error(f"File not found: {market_file}")
+                st.info(f"Please check path or update LOCAL_DATA_DIR in data_loader.py")
                 st.stop()
             
-            # Load từ local files
+            # Load from local files
             market_df = pd.read_parquet(market_file)
             industry_df = pd.read_parquet(industry_file)
             ticker_df = pd.read_parquet(ticker_file)
             map_df = pd.read_excel(LOCAL_MAP_PATH)
             
-            # Sắp xếp theo thời gian
+            # Sort by time
             market_df = market_df.sort_values(['YEAR', 'QUARTER'])
             industry_df = industry_df.sort_values(['SYMBOL', 'YEAR', 'QUARTER'])
             ticker_df = ticker_df.sort_values(['SYMBOL', 'YEAR', 'QUARTER'])
             
-            st.success('✅ Đã tải xong dữ liệu từ local files!')
+            st.success('Successfully loaded data from local files!')
             
             return market_df, industry_df, ticker_df, map_df
             
         except Exception as e:
-            st.error(f"❌ Lỗi khi load dữ liệu từ local: {e}")
+            st.error(f"Error loading data from local: {e}")
             st.info(f"""
-            **Vui lòng kiểm tra:**
-            - Đường dẫn local có đúng không?
-            - Files có tồn tại không?
+            Please check:
+            - Are the local paths correct?
+            - Do the files exist?
             
-            **Đường dẫn hiện tại:**
+            Current paths:
             - LOCAL_DATA_DIR: {LOCAL_DATA_DIR}
             - LOCAL_MAP_PATH: {LOCAL_MAP_PATH}
             
-            **Cập nhật trong:** utils/data_loader.py (dòng 17-18)
+            Update in: data_loader.py (lines 17-18)
             """)
             st.stop()
 
@@ -201,10 +200,10 @@ def load_all_data():
 @st.cache_data(ttl=3600)
 def get_market_data():
     """
-    Load dữ liệu thị trường
+    Load market data
     
     Returns:
-        DataFrame: Dữ liệu thị trường đã sắp xếp
+        DataFrame: Sorted market data
     """
     market_df, _, _, _ = load_all_data()
     return market_df
@@ -213,10 +212,10 @@ def get_market_data():
 @st.cache_data(ttl=3600)
 def get_industry_data():
     """
-    Load dữ liệu ngành
+    Load industry data
     
     Returns:
-        DataFrame: Dữ liệu ngành đã sắp xếp
+        DataFrame: Sorted industry data
     """
     _, industry_df, _, _ = load_all_data()
     return industry_df
@@ -225,10 +224,10 @@ def get_industry_data():
 @st.cache_data(ttl=3600)
 def get_ticker_data():
     """
-    Load dữ liệu ticker
+    Load ticker data
     
     Returns:
-        DataFrame: Dữ liệu ticker đã sắp xếp
+        DataFrame: Sorted ticker data
     """
     _, _, ticker_df, _ = load_all_data()
     return ticker_df
@@ -237,28 +236,28 @@ def get_ticker_data():
 @st.cache_data(ttl=3600)
 def get_map_data():
     """
-    Load dữ liệu mapping (Map_Complete.xlsx)
+    Load mapping data (Map_Complete.xlsx)
     
     Returns:
-        DataFrame: Dữ liệu mapping
+        DataFrame: Mapping data
     """
     _, _, _, map_df = load_all_data()
     return map_df
 
 
 # ============================================
-# PHẦN 5: UTILITY FUNCTIONS (GIỮ NGUYÊN)
+# UTILITY FUNCTIONS
 # ============================================
 
 def get_available_quarters(df):
     """
-    Lấy danh sách các quarter có sẵn
+    Get list of available quarters
     
     Args:
-        df: DataFrame chứa cột QUARTER và YEAR
+        df: DataFrame with QUARTER and YEAR columns
         
     Returns:
-        list: Danh sách các quarter theo format 'YYYYQX'
+        list: List of quarters in format 'YYYYQX'
     """
     quarters = df[['YEAR', 'QUARTER']].drop_duplicates()
     quarters['KEY'] = quarters['YEAR'].astype(str) + quarters['QUARTER']
@@ -267,46 +266,46 @@ def get_available_quarters(df):
 
 def get_available_industries(industry_df):
     """
-    Lấy danh sách các ngành có sẵn
+    Get list of available industries
     
     Args:
-        industry_df: DataFrame ngành
+        industry_df: Industry DataFrame
         
     Returns:
-        list: Danh sách tên ngành
+        list: List of industry names
     """
     return sorted(industry_df['SYMBOL'].unique())
 
 
 def get_available_tickers(ticker_df):
     """
-    Lấy danh sách các ticker có sẵn
+    Get list of available tickers
     
     Args:
-        ticker_df: DataFrame ticker
+        ticker_df: Ticker DataFrame
         
     Returns:
-        list: Danh sách ticker symbols
+        list: List of ticker symbols
     """
     return sorted(ticker_df['SYMBOL'].unique())
 
 
 def get_ticker_info(ticker_df, symbol):
     """
-    Lấy thông tin chi tiết của một ticker
+    Get detailed information for a ticker
     
     Args:
-        ticker_df: DataFrame ticker
-        symbol: Mã cổ phiếu
+        ticker_df: Ticker DataFrame
+        symbol: Stock symbol
         
     Returns:
-        dict: Thông tin ticker hoặc None nếu không tìm thấy
+        dict: Ticker information or None if not found
     """
     ticker_data = ticker_df[ticker_df['SYMBOL'] == symbol]
     if ticker_data.empty:
         return None
     
-    # Lấy dữ liệu quý gần nhất
+    # Get latest quarter data
     latest = ticker_data.iloc[-1]
     
     return {
@@ -320,15 +319,15 @@ def get_ticker_info(ticker_df, symbol):
 
 def filter_data_by_date_range(df, start_quarter, end_quarter):
     """
-    Lọc dữ liệu theo khoảng thời gian
+    Filter data by date range
     
     Args:
         df: DataFrame
-        start_quarter: Quarter bắt đầu (format: 'YYYYQX')
-        end_quarter: Quarter kết thúc (format: 'YYYYQX')
+        start_quarter: Start quarter (format: 'YYYYQX')
+        end_quarter: End quarter (format: 'YYYYQX')
         
     Returns:
-        DataFrame: Dữ liệu đã được lọc
+        DataFrame: Filtered data
     """
     start_year = int(start_quarter[:4])
     start_q = int(start_quarter[-1])
@@ -345,14 +344,14 @@ def filter_data_by_date_range(df, start_quarter, end_quarter):
 
 def get_latest_data(df, symbol=None):
     """
-    Lấy dữ liệu quý gần nhất
+    Get latest quarter data
     
     Args:
         df: DataFrame
-        symbol: Mã ticker hoặc ngành (optional)
+        symbol: Ticker or industry symbol (optional)
         
     Returns:
-        Series hoặc DataFrame: Dữ liệu quý gần nhất
+        Series or DataFrame: Latest quarter data
     """
     if symbol:
         df = df[df['SYMBOL'] == symbol]
@@ -360,29 +359,29 @@ def get_latest_data(df, symbol=None):
     if df.empty:
         return None
     
-    # Lấy quý gần nhất
+    # Get latest quarter
     latest_idx = df[['YEAR', 'QUARTER']].apply(lambda x: (x['YEAR'], x['QUARTER']), axis=1).idxmax()
     return df.loc[latest_idx]
 
 
 def get_metrics_for_tickers(ticker_df, symbols, metrics):
     """
-    Lấy các chỉ số tài chính cho nhiều ticker
+    Get financial metrics for multiple tickers
     
     Args:
-        ticker_df: DataFrame ticker
-        symbols: List các mã cổ phiếu
-        metrics: List các chỉ số cần lấy
+        ticker_df: Ticker DataFrame
+        symbols: List of stock symbols
+        metrics: List of metrics to retrieve
         
     Returns:
-        DataFrame: Bảng so sánh các chỉ số
+        DataFrame: Comparison table of metrics
     """
     result = []
     
     for symbol in symbols:
         latest = get_latest_data(ticker_df, symbol)
         if latest is not None:
-            row = {'Mã CK': symbol}
+            row = {'Symbol': symbol}
             for metric in metrics:
                 row[metric] = latest.get(metric, None)
             result.append(row)
@@ -392,14 +391,14 @@ def get_metrics_for_tickers(ticker_df, symbols, metrics):
 
 def search_tickers(ticker_df, keyword):
     """
-    Tìm kiếm ticker theo từ khóa
+    Search tickers by keyword
     
     Args:
-        ticker_df: DataFrame ticker
-        keyword: Từ khóa tìm kiếm
+        ticker_df: Ticker DataFrame
+        keyword: Search keyword
         
     Returns:
-        list: Danh sách ticker phù hợp
+        list: List of matching tickers
     """
     keyword = keyword.upper()
     matching = ticker_df[ticker_df['SYMBOL'].str.contains(keyword, na=False)]['SYMBOL'].unique()
